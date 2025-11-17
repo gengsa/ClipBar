@@ -1,5 +1,7 @@
 # ClipBar
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
 简短说明
 - ClipBar 是一个用于 macOS 的多重粘贴板管理工具（菜单栏常驻，使用 Swift + SwiftUI 开发）。
 - 目标用户：频繁复制粘贴文本/代码/图片/文件的开发者与内容创作者。
@@ -37,4 +39,8 @@
 - 全局快捷键：推荐 HotKey (soffes/HotKey) 或 MASShortcut；注意 App Sandbox 的影响。
 - 数据模型：ClipItem（类型 text/image/file 等、内容引用、时间戳、标签/备注）。
 - 权限/沙盒：若计划上架 Mac App Store，注意沙盒对文件访问与剪贴板的限制。
+
+## License
+
+This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
 
