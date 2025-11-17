@@ -27,6 +27,11 @@
 		906100552ECAC15100A4FBCA /* ClipBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClipBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		906100622ECAC15400A4FBCA /* ClipBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9061006C2ECAC15500A4FBCA /* ClipBarUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipBarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		907DCE262ECB0EE6006BE10D /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		907DCE272ECB0EE6006BE10D /* CONTRIBUTING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONTRIBUTING.md; sourceTree = "<group>"; };
+		907DCE282ECB0EE6006BE10D /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		907DCE292ECB0EE6006BE10D /* NOTICE */ = {isa = PBXFileReference; lastKnownFileType = text; path = NOTICE; sourceTree = "<group>"; };
+		907DCE2A2ECB0EE6006BE10D /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -79,6 +84,11 @@
 				906100652ECAC15400A4FBCA /* ClipBarTests */,
 				9061006F2ECAC15500A4FBCA /* ClipBarUITests */,
 				906100562ECAC15100A4FBCA /* Products */,
+				907DCE262ECB0EE6006BE10D /* .gitignore */,
+				907DCE272ECB0EE6006BE10D /* CONTRIBUTING.md */,
+				907DCE282ECB0EE6006BE10D /* LICENSE */,
+				907DCE292ECB0EE6006BE10D /* NOTICE */,
+				907DCE2A2ECB0EE6006BE10D /* README.md */,
 			);
 			sourceTree = "<group>";
 		};
