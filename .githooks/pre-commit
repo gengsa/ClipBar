@@ -1,0 +1,40 @@
+# .git/hooks/pre-commit
+# Pre-commit hook for Xcode/Swift project
+# Does NOT specify a shell. Only requires addlicense in current PATH.
+
+info()  { printf "\033[0;32m%s\033[0m\n" "$1"; }
+error() { printf "\033[0;31m%s\033[0m\n" "$1"; }
+
+COPYRIGHT_NAME="gengsa"
+LICENSE_HEADER="apache"
+
+# 检查 addlicense 是否可用
+if ! command -v addlicense >/dev/null 2>&1; then
+    error "❌ ERROR: addlicense command not found in your PATH."
+    error "\tInstall: brew install addlicense"
+    exit 1
+fi
+
+# 获取本次提交的文件（遵循 .gitignore）
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+[ -z "$STAGED_FILES" ] && exit 0
+
+# 检查 license
+info "🔍 Checking license headers..."
+
+while IFS= read -r file; do
+    addlicense -check -c "$COPYRIGHT_NAME" -l "$LICENSE_HEADER" "$file"
+    # 捕获 addlicense 退出码
+    if [ $? -ne 0 ]; then
+        error "❌ License check failed! Please add missing headers."
+        # 使用 -z 和 args -0 安全的处理包含空格和换行符的文件名
+        error  "    git diff --cached --name-only --diff-filter=ACM -z | xargs -0 addlicense -c \"$COPYRIGHT_NAME\" -v -l \"$LICENSE_HEADER\""
+        error "    Don't forget add changes file using git add."
+        exit 1
+    fi
+done <<< "$STAGED_FILES"
+
+info "✅ License check passed!"
+exit 0
+

@@ -28,10 +28,13 @@
 1. 安装 Xcode（建议 Xcode 14+），目标最低 macOS: 12（你选择的 macOS 12）
 2. 克隆仓库
    git clone https://github.com/gengsa/ClipBar.git
-3. 打开 Xcode 项目
+3. 启用 githooks（可选）
+    chmod +x .githooks/pre-commit
+    git config core.hooksPath .githooks
+4. 打开 Xcode 项目
    open ClipBar/ClipBar.xcodeproj
-4. 在 Xcode 中选择运行目标（My Mac），按 ⌘R 或 使用 Run 按钮
-5. 运行测试：Product → Test（或 xcodebuild test）
+5. 在 Xcode 中选择运行目标（My Mac），按 ⌘R 或 使用 Run 按钮
+6. 运行测试：Product → Test（或 xcodebuild test）
 
 实现要点（参考）
 - 剪贴板监听：通常通过 NSPasteboard.general.changeCount 的定期检查（Combine + Timer），或结合 AppKit 的事件/策略优化。
