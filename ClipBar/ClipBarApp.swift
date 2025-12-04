@@ -20,12 +20,18 @@
 //
 
 import SwiftUI
+import AppKit
 
 @main
 struct ClipBarApp: App {
+    // 使用 AppDelegate 来管理菜单栏图标和 popover
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        // 若采用 menu-driven，可以不用 WindowGroup 显示主 window
+        // 不显示默认 WindowGroup，保留 Settings（可选）
+        Settings {
+            EmptyView()
         }
     }
 }
