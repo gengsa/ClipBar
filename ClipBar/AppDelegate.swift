@@ -49,16 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func selectClipMenuItem(_ sender: NSMenuItem) {
         guard let s = sender.representedObject as? String else { return }
-        // 把选中内容放入系统剪贴板
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.setString(s, forType: .string)
-
-        // 简单反馈（可换成更友好的 UI）
-        NSSound.beep()
-
-        // 可选：直接向前台应用发送粘贴（需 Accessibility 权限） —— 在这里慎用
-        // AppEnvironment.current.pasteService.pasteFromClipboard()
+        AutoPasteHelper.shared.writeAndAutoPaste(s, autoPaste: true, useCGEvent: true)
     }
 
     @objc func showPreferenceWindow() {

@@ -20,7 +20,7 @@ ClipBar — 一个轻量的 macOS 剪贴板历史工具（菜单栏常驻）。
 技术栈（建议）
 - 语言：Swift 5+
 - UI：AppKit（NSMenu / NSStatusItem）（用于粘贴板历史菜单）+ SwiftUI（用于偏好设置、编辑窗口）
-- 异步/响应式：Combine（订阅 ClipboardManager.items 自动刷新菜单
+- 异步/响应式：Combine（订阅 ClipboardManager.items 自动刷新菜单）
 - 剪贴板访问：NSPasteboard（通过 changeCount 轮询或轻量监听策略）
 - 存储：当前为内存保留（可扩展为 File Codable / Core Data / Realm）
 - 全局快捷键：HotKey / Magnet / Carbon 封装库
