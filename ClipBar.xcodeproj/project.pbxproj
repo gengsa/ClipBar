@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		903275F12EE970E1002B2338 /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = 903275F02EE970E1002B2338 /* HotKey */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		906100632ECAC15400A4FBCA /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -58,6 +62,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				903275F12EE970E1002B2338 /* HotKey in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -132,6 +137,7 @@
 			);
 			name = ClipBar;
 			packageProductDependencies = (
+				903275F02EE970E1002B2338 /* HotKey */,
 			);
 			productName = ClipBar;
 			productReference = 906100552ECAC15100A4FBCA /* ClipBar.app */;
@@ -215,6 +221,9 @@
 			);
 			mainGroup = 9061004C2ECAC15100A4FBCA;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				903275EF2EE970E1002B2338 /* XCRemoteSwiftPackageReference "HotKey" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 906100562ECAC15100A4FBCA /* Products */;
 			projectDirPath = "";
@@ -583,6 +592,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		903275EF2EE970E1002B2338 /* XCRemoteSwiftPackageReference "HotKey" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/soffes/HotKey";
+			requirement = {
+				kind = exactVersion;
+				version = 0.2.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		903275F02EE970E1002B2338 /* HotKey */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 903275EF2EE970E1002B2338 /* XCRemoteSwiftPackageReference "HotKey" */;
+			productName = HotKey;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9061004D2ECAC15100A4FBCA /* Project object */;
 }

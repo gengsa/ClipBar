@@ -21,6 +21,7 @@
 
 import Cocoa
 import SwiftUI
+import HotKey
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
@@ -43,6 +44,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 绑定 MenuManager（注意：MenuManager.setup 会把 menu 赋给 statusItem）
         MenuManager.shared.setup(statusItem: statusItem)
+        
+        // 注册全局热键 Cmd+Shift+V
+        HotKeyManager.shared.setup(statusItem: statusItem, key: .v, modifiers: [.command, .shift])
     }
 
     // MARK: - Menu actions
@@ -68,5 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         print("[AppDelegate] applicationWillTerminate")
+        // 注销热键（清理）
+        HotKeyManager.shared.unregister()
     }
 }
