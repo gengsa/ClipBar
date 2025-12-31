@@ -53,7 +53,7 @@ final class MenuManager: NSObject {
     func rebuildMenu() {
         clipMenu.removeAllItems()
 
-        let items = ClipboardManager.shared.items // [String] 或你自定义的模型的展示字段
+        let items = ClipboardManager.shared.items
         guard !items.isEmpty else {
             let empty = NSMenuItem(title: "No clipboard history", action: nil, keyEquivalent: "")
             empty.isEnabled = false
@@ -68,12 +68,21 @@ final class MenuManager: NSObject {
         let count = items.count
         let mainCount = min(pageSize, count)
         for i in 0..<mainCount {
-            let s = items[i]
-            let label = shortTitle(for: s, index: i + 1)
+            let item = items[i]
+            let label = menuTitle(for: item, index: i + 1)
             let keyEq = String((i + 1) % 10) // 1..9
             let mi = NSMenuItem(title: label, action: #selector(AppDelegate.selectClipMenuItem(_:)), keyEquivalent: keyEq)
-            mi.representedObject = s
+            mi.representedObject = item.id.uuidString
             mi.target = NSApp.delegate
+            
+            // 为图片类型添加缩略图
+            if item.type == .image, let imageData = item.imageData {
+                if let image = NSImage(data: imageData) {
+                    let thumbnail = image.resized(to: NSSize(width: 32, height: 32))
+                    mi.image = thumbnail
+                }
+            }
+            
             clipMenu.addItem(mi)
         }
 
@@ -85,11 +94,19 @@ final class MenuManager: NSObject {
                 let end = min(start + pageSize, count)
                 let submenu = NSMenu(title: "Page \(page)")
                 for j in start..<end {
-                    let s = items[j]
-                    let label = shortTitle(for: s, index: j + 1)
+                    let item = items[j]
+                    let label = menuTitle(for: item, index: j + 1)
                     let mi = NSMenuItem(title: label, action: #selector(AppDelegate.selectClipMenuItem(_:)), keyEquivalent: "")
-                    mi.representedObject = s
+                    mi.representedObject = item.id.uuidString
                     mi.target = NSApp.delegate
+                    
+                    if item.type == . image, let imageData = item.imageData {
+                        if let image = NSImage(data: imageData) {
+                            let thumbnail = image.resized(to: NSSize(width: 32, height: 32))
+                            mi.image = thumbnail
+                        }
+                    }
+                    
                     submenu.addItem(mi)
                 }
                 let parent = NSMenuItem(title: "More (page \(page))", action: nil, keyEquivalent: "")
@@ -106,9 +123,48 @@ final class MenuManager: NSObject {
         clipMenu.addItem(NSMenuItem(title: "Quit", action: #selector(AppDelegate.terminate), keyEquivalent: "q"))
     }
 
+    private func menuTitle(for item: ClipboardItem, index: Int) -> String {
+        let typeIcon: String
+        switch item.type {
+        case .text:
+            typeIcon = "📝"
+        case .rtf:
+            typeIcon = "📄"
+        case .html:
+            typeIcon = "🌐"
+        case .image:
+            typeIcon = "🖼️"
+        case .file:
+            typeIcon = "📁"
+        case .spreadsheet:
+            typeIcon = "📊"
+        }
+        
+        let preview = item.displayText
+            .replacingOccurrences(of: "\n", with: " ")
+            .prefix(50)
+        
+        return "\(index). \(typeIcon) \(preview)"
+    }
+
     private func shortTitle(for s: String, index: Int) -> String {
-        let maxLen = 60
-        let display = s.count > maxLen ? String(s.prefix(maxLen)) + "…" : s
-        return "\(index). \(display)"
+        let oneLinePreview = s.replacingOccurrences(of:  "\n", with: " ").prefix(50)
+        return "\(index). \(oneLinePreview)"
+    }
+}
+
+// 图片缩放扩展
+extension NSImage {
+    func resized(to newSize: NSSize) -> NSImage {
+        let newImage = NSImage(size: newSize)
+        newImage.lockFocus()
+        let context = NSGraphicsContext.current
+        context?.imageInterpolation = .high
+        self.draw(in: NSRect(origin: .zero, size: newSize),
+                  from: NSRect(origin: .zero, size: self.size),
+                  operation: .copy,
+                  fraction: 1.0)
+        newImage.unlockFocus()
+        return newImage
     }
 }

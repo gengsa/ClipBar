@@ -26,7 +26,8 @@ import Combine
 final class ClipboardManager: ObservableObject {
     static let shared = ClipboardManager()
 
-    @Published private(set) var items: [String] = [] // 当前剪贴板历史（最新在前）
+    // 最新复制的的在前面
+    @Published private(set) var items: [ClipboardItem] = []
 
     private let pasteboard = NSPasteboard.general
     private var changeCount: Int
@@ -63,26 +64,30 @@ final class ClipboardManager: ObservableObject {
             guard current != self.changeCount else { return }
             self.changeCount = current
 
-            if let s = self.pasteboard.string(forType: .string) {
-                self.handleNewClipboardString(s)
+            // 从剪贴板创建 ClipboardItem
+            if let item = ClipboardItem.from(pasteboard: self.pasteboard) {
+                self.handleNewClipboardItem(item)
             }
         }
     }
 
     // MARK: - Mutations / API
 
-    /// 处理新检测到的剪贴文本（公有，外部也可直接调用）
-    func handleNewClipboardString(_ str: String) {
-        // 去重：与最新项相同则跳过
+    /// 处理新检测到的剪贴板条目
+    func handleNewClipboardItem(_ item: ClipboardItem) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return }
 
-            if self.items.first == trimmed { return }
+            // 去重：与最新项相同则跳过 (简单比较 displayText)
+            // TODO: 可能得去重写对象的 equals 方法，或者给 ClipboardItem 增加 hashable 支持然后比较 hash 值
+            if let first = self.items.first,
+               first.displayText == item.displayText,
+               first.type == item.type {
+                return
+            }
 
             // 插入到最前面
-            self.items.insert(trimmed, at: 0)
+            self.items.insert(item, at: 0)
 
             // 限制长度
             if self.items.count > self.maxItems {
@@ -98,45 +103,11 @@ final class ClipboardManager: ObservableObject {
         }
     }
 
-    /// 删除匹配的条目（按值删除所有匹配项）
-    func delete(_ value: String) {
-        DispatchQueue.main.async { [weak self] in
-            self?.items.removeAll { $0 == value }
-        }
-    }
-
     /// 删除指定索引（安全检查）
     func delete(at index: Int) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self, self.items.indices.contains(index) else { return }
             self.items.remove(at: index)
-        }
-    }
-
-    /// 导入一组条目（会合并并去重，最新条目放前面）
-    func importItems(_ newItems: [String]) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            for s in newItems.reversed() { // 让 newItems[0] 成为最早项
-                let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty { continue }
-                if self.items.first != trimmed {
-                    self.items.insert(trimmed, at: 0)
-                }
-            }
-            if self.items.count > self.maxItems {
-                self.items.removeLast(self.items.count - self.maxItems)
-            }
-        }
-    }
-
-    /// 手动把字符串写入系统剪贴板（供菜单/选择项调用）
-    func writeToPasteboard(_ s: String) {
-        DispatchQueue.main.async {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(s, forType: .string)
-            // 更新 changeCount，以避免立即被轮询重复读取
-            self.changeCount = self.pasteboard.changeCount
         }
     }
 }

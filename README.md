@@ -29,6 +29,7 @@ ClipBar — 一个轻量的 macOS 剪贴板历史工具（菜单栏常驻）。
 - 全局快捷键：HotKey (soffes/HotKey) 
 - 测试：XCTest（单元测试 + UI Tests）（暂未启用，后续添加）
 - CI：GitHub Actions（macos-latest）（暂未启用，后续添加）
+- 包管理器：Swift Package Manager
 
 ## 开发与本地运行（开发者）
 

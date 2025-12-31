@@ -20,12 +20,9 @@
 //
 
 
-//
-// AutoPasteHelper.swift
 // 把字符串写入剪贴板并可选地模拟一次 Cmd+V 自动粘贴（需要辅助功能权限）
 // 使用方法：AutoPasteHelper.shared.writeAndAutoPaste(s, autoPaste: true)
 // 注意：调用自动粘贴前请提醒用户在 系统偏好 → 隐私与安全 → 辅助功能 中允许本 App
-//
 
 import Cocoa
 import ApplicationServices
@@ -35,53 +32,22 @@ final class AutoPasteHelper {
 
     private init() {}
 
-    /// 直接写入剪贴板
-    func writeToPasteboard(_ s: String) {
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.setString(s, forType: .string)
-        // 简单反馈（可换成更友好的 UI）
-        NSSound.beep()
-    }
-
     /// 写入剪贴板并根据 autoPaste 决定是否发送一次 Cmd+V
     /// useCGEvent: true 使用 CGEvent（推荐），false 使用 AppleScript
-    func writeAndAutoPaste(_ s: String, autoPaste: Bool, useCGEvent: Bool = true) {
-        // 把选中内容放入系统剪贴板
-        writeToPasteboard(s)
-        guard autoPaste else { return }
-
-        // 如果没有辅助功能权限，先弹出系统授权提示（会打开设置或触发系统提示）
-        if !isAccessibilityTrusted() {
-            // 尝试主动触发系统授权提示
-            _ = requestAccessibilityPermissionPrompt()
-            // 同时打开系统设置到辅助功能页，方便用户授权（有时系统不会自动打开）
-            openAccessibilityPreferences()
-            return
-        }
-
-        // 发送 Cmd+V
-        if useCGEvent {
-            sendCmdV_CGEvent()
-        } else {
-            sendCmdV_AppleScript()
+    func writeAndAutoPaste(_ item: ClipboardItem, autoPaste: Bool, useCGEvent: Bool = true) {
+        // 1. 写入剪贴板
+        item.writeTo(pasteboard: NSPasteboard.general)
+        
+        // 2. 如果需要自动粘贴
+        if autoPaste {
+            // 延迟一点确保剪贴板已更新
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.simulatePaste(useCGEvent: useCGEvent)
+            }
         }
     }
 
     // MARK: - 权限检查与提示
-
-    /// 检查是否已被授予辅助功能权限
-    func isAccessibilityTrusted() -> Bool {
-        return AXIsProcessTrusted()
-    }
-
-    /// 请求辅助功能权限并弹出系统提示（会在 macOS 上触发“要授权吗？”的对话）
-    /// 返回当前检查结果（true 表示已授权）
-    @discardableResult
-    func requestAccessibilityPermissionPrompt() -> Bool {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
-    }
 
     /// 打开系统偏好到辅助功能/隐私页，帮助用户手动授权
     func openAccessibilityPreferences() {
@@ -94,16 +60,43 @@ final class AutoPasteHelper {
         }
     }
 
-    // MARK: - 发送按键（两种实现）
+    private func showAccessibilityAlert() {
+        let alert = NSAlert()
+        alert.messageText = "需要辅助功能权限"
+        alert.informativeText = "请在\"系统偏好设置 → 隐私与安全 → 辅助功能\"中允许 ClipBar 控制您的电脑。"
+        alert.alertStyle = . warning
+        alert.addButton(withTitle: "打开系统偏好设置")
+        alert.addButton(withTitle: "取消")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            openAccessibilityPreferences()
+        }
+    }
+
+    // MARK: - 粘贴（两种实现）
+
+    /// 模拟 Cmd+V 粘贴操作
+    private func simulatePaste(useCGEvent: Bool = true) {
+        if useCGEvent {
+            simulatePasteWithCGEvent()
+        } else {
+            simulatePasteWithAppleScript()
+        }
+    }
 
     /// AppleScript 实现（简单但可能比 CGEvent 更慢）
-    private func sendCmdV_AppleScript() {
-        let script = "tell application \"System Events\" to keystroke \"v\" using command down"
-        if let appleScript = NSAppleScript(source: script) {
-            var err: NSDictionary?
-            appleScript.executeAndReturnError(&err)
-            if let e = err {
-                NSLog("[AutoPaste] AppleScript error: \(e)")
+    private func simulatePasteWithAppleScript() {
+        let script = """
+        tell application "System Events"
+            keystroke "v" using command down
+        end tell
+        """
+        var error: NSDictionary?
+        if let scriptObject = NSAppleScript(source: script) {
+            scriptObject.executeAndReturnError(&error)
+            if let err = error {
+                print("[AutoPasteHelper] AppleScript error: \(err)")
             }
         }
     }
@@ -111,18 +104,24 @@ final class AutoPasteHelper {
     /// CGEvent 实现（更底层、推荐）
     /// 注意：虚拟键码基于常见 US 键盘布局， 'v' 的 keycode 常为 9（Intel/Mac）。
     /// 对于非常规布局此值可能不同；若要更保险可做更复杂的映射。
-    private func sendCmdV_CGEvent() {
-        guard let src = CGEventSource(stateID: .combinedSessionState) else { return }
-        let vKeyCode: CGKeyCode = 9 // 常用 v 键码
-
-        // key down (Cmd + v)
-        if let keyDown = CGEvent(keyboardEventSource: src, virtualKey: vKeyCode, keyDown: true) {
-            keyDown.flags = .maskCommand
+    private func simulatePasteWithCGEvent() {
+        // 确保有辅助功能权限
+        guard AXIsProcessTrusted() else {
+            print("[AutoPasteHelper] ⚠️ 需要辅助功能权限")
+            // 可以考虑弹窗提示用户
+            showAccessibilityAlert()
+            return
+        }
+        let vKey = CGKeyCode(0x09) // V key
+        let cmdFlag = CGEventFlags.maskCommand
+        // Cmd+V down
+        if let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: vKey, keyDown:  true) {
+            keyDown.flags = cmdFlag
             keyDown.post(tap: .cghidEventTap)
         }
-        // key up
-        if let keyUp = CGEvent(keyboardEventSource: src, virtualKey: vKeyCode, keyDown: false) {
-            keyUp.flags = .maskCommand
+        // Cmd+V up
+        if let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: vKey, keyDown: false) {
+            keyUp.flags = cmdFlag
             keyUp.post(tap: .cghidEventTap)
         }
     }

@@ -52,8 +52,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Menu actions
 
     @objc func selectClipMenuItem(_ sender: NSMenuItem) {
-        guard let s = sender.representedObject as? String else { return }
-        AutoPasteHelper.shared.writeAndAutoPaste(s, autoPaste: true, useCGEvent: true)
+        guard let itemIDString = sender.representedObject as? String,
+              let itemID = UUID(uuidString: itemIDString) else { return }
+        
+        // 从 ClipboardManager 中找到对应的 item，并触发粘贴
+        if let item = ClipboardManager.shared.items.first(where: { $0.id == itemID }) {
+            AutoPasteHelper.shared.writeAndAutoPaste(item, autoPaste: true, useCGEvent: true)
+        }
     }
 
     @objc func showPreferenceWindow() {
