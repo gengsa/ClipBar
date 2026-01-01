@@ -78,8 +78,15 @@ final class MenuManager: NSObject {
             // 为图片类型添加缩略图
             if item.type == .image, let imageData = item.imageData {
                 if let image = NSImage(data: imageData) {
-                    let thumbnail = image.resized(to: NSSize(width: 32, height: 32))
+                    let thumbnail = image.resize(to: NSSize(width: 32, height: 32))
                     mi.image = thumbnail
+                }
+            }
+            // 为颜色类型添加色块预览
+            if item.type == .color, let colorValue = item.colorValue {
+                if let color = NSColor(hexString: colorValue) {
+                    let colorImage = NSImage.create(with: color, size: NSSize(width: 20, height: 20))
+                    mi.image = colorImage
                 }
             }
             
@@ -102,11 +109,18 @@ final class MenuManager: NSObject {
                     
                     if item.type == . image, let imageData = item.imageData {
                         if let image = NSImage(data: imageData) {
-                            let thumbnail = image.resized(to: NSSize(width: 32, height: 32))
+                            let thumbnail = image.resize(to: NSSize(width: 32, height: 32))
                             mi.image = thumbnail
                         }
                     }
-                    
+                    // 为颜色类型添加色块预览
+                    if item.type == .color, let colorValue = item.colorValue {
+                        if let color = NSColor(hexString: colorValue) {
+                            let colorImage = NSImage.create(with: color, size: NSSize(width: 20, height: 20))
+                            mi.image = colorImage
+                        }
+                    }
+
                     submenu.addItem(mi)
                 }
                 let parent = NSMenuItem(title: "More (page \(page))", action: nil, keyEquivalent: "")
@@ -130,12 +144,20 @@ final class MenuManager: NSObject {
             typeIcon = "📝"
         case .rtf:
             typeIcon = "📄"
+        case .rtfd:
+            typeIcon = "📋"  // 带图片的文档
         case .html:
             typeIcon = "🌐"
+        case .pdf:
+            typeIcon = "📕"
         case .image:
             typeIcon = "🖼️"
         case .file:
             typeIcon = "📁"
+        case .url:
+            typeIcon = "🔗"
+        case .color:
+            typeIcon = "🎨"
         case .spreadsheet:
             typeIcon = "📊"
         }
@@ -150,21 +172,5 @@ final class MenuManager: NSObject {
     private func shortTitle(for s: String, index: Int) -> String {
         let oneLinePreview = s.replacingOccurrences(of:  "\n", with: " ").prefix(50)
         return "\(index). \(oneLinePreview)"
-    }
-}
-
-// 图片缩放扩展
-extension NSImage {
-    func resized(to newSize: NSSize) -> NSImage {
-        let newImage = NSImage(size: newSize)
-        newImage.lockFocus()
-        let context = NSGraphicsContext.current
-        context?.imageInterpolation = .high
-        self.draw(in: NSRect(origin: .zero, size: newSize),
-                  from: NSRect(origin: .zero, size: self.size),
-                  operation: .copy,
-                  fraction: 1.0)
-        newImage.unlockFocus()
-        return newImage
     }
 }

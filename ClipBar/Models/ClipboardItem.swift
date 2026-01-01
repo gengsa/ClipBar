@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //
-//  ClipboardItemType.swift
+//  ClipboardItem.swift
 //  ClipBar
 //
 //  Created by 王钊 on 2025/12/31.
@@ -25,10 +25,14 @@ import AppKit
 /// 剪贴板条目类型
 enum ClipboardItemType: String, Codable {
     case text           // 纯文本
-    case rtf            // 富文本
+    case rtf            // 富文本（简单）
+    case rtfd           // 富文本（带图片）
     case html           // HTML
+    case pdf            // PDF 文档
     case image          // 图片
     case file           // 文件引用
+    case url            // URL 链接
+    case color          // 颜色代码
     case spreadsheet    // 表格数据
 }
 
@@ -39,17 +43,28 @@ struct ClipboardItem: Identifiable, Codable {
     let timestamp: Date
     
     // 不同类型的数据存储
-    var stringValue: String?          // 文本/HTML
-    var rtfData: Data?              // RTF 数据
-    var imageData: Data?            // 图片数据
-    var fileURLs: [String]?         // 文件路径
-    var spreadsheetData: Data?      // 表格数据 (可能是 TSV/CSV)
+    var stringValue: String?           // 文本/HTML/URL
+    var rtfData: Data?                 // RTF 数据
+    var rtfdData: Data?                // RTFD 数据（带图片的富文本）
+    var pdfData: Data?                 // PDF 数据
+    var imageData: Data?               // 图片数据
+    var fileURLs: [String]?            // 文件路径（支持多文件）
+    var spreadsheetData: Data?         // 表格数据 (TSV/CSV)
+    var colorValue: String?            // 颜色值（如 #FF5733）
     
     // 用于显示的预览文本
     var displayText: String {
         switch type {
-        case .text, .html:
+        case .text:
             return stringValue?.prefix(100).description ?? ""
+        case .html:
+           // 从 HTML 提取纯文本用于预览
+            if let html = stringValue,
+               let data = html.data(using: .utf8),
+               let attributed = NSAttributedString(html: data, documentAttributes: nil) {
+                return attributed.string.prefix(100).description
+            }
+            return "[HTML]"
         case .rtf:
             // 从 RTF 数据提取纯文本用于预览
             if let data = rtfData,
@@ -57,13 +72,30 @@ struct ClipboardItem: Identifiable, Codable {
                 return attributed.string.prefix(100).description
             }
             return "[Rich Text]"
+        case .rtfd:
+            if let data = rtfdData,
+               let attributed = try? NSAttributedString(rtfd: data, documentAttributes: nil) {
+                return attributed.string.prefix(100).description
+            }
+            return "[Rich Text with Images]"
+        case .pdf:
+            return "[PDF Document]"
         case .image:
             return "[Image]"
         case .file:
             if let urls = fileURLs {
-                return urls.joined(separator: ", ")
+                let fileNames = urls.map { URL(fileURLWithPath: $0).lastPathComponent }
+                if fileNames.count == 1 {
+                    return fileNames[0]
+                } else {
+                    return "\(fileNames.count) files: \(fileNames.prefix(3).joined(separator: ", "))"
+                }
             }
             return "[File]"
+        case .url:
+            return stringValue ?? "[URL]"
+        case .color:
+            return colorValue ?? "[Color]"
         case .spreadsheet:
             return "[Spreadsheet Data]"
         }
@@ -73,11 +105,21 @@ struct ClipboardItem: Identifiable, Codable {
     static func from(pasteboard: NSPasteboard) -> ClipboardItem? {
         let types = pasteboard.types ??  []
         
-        // 优先级：文件 > 图片 > RTF > HTML > 纯文本
+        // 优先级顺序（从高到低）：
+        // 1. 文件（最具体）
+        // 2. 图片
+        // 3. PDF
+        // 4. RTFD（带图片的富文本）
+        // 5. RTF
+        // 6. 表格数据
+        // 7. URL（单独的链接）
+        // 8. HTML
+        // 9. 颜色代码（检测 #RRGGBB 格式）
+        // 10. 纯文本（最通用）
         
         // 1. 文件
         if types.contains(.fileURL),
-           let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] {
+           let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL], !urls.isEmpty {
             return ClipboardItem(
                 id: UUID(),
                 type: .file,
@@ -93,11 +135,44 @@ struct ClipboardItem: Identifiable, Codable {
                 id: UUID(),
                 type: .image,
                 timestamp: Date(),
-                imageData:  imageData
+                imageData: imageData
             )
         }
         
-        // 3. 表格数据 (TSV - Tab Separated Values, 通常用于 Excel/Numbers 复制)
+        // 3. PDF
+        if types.contains(.pdf),
+           let pdfData = pasteboard.data(forType: .pdf) {
+            return ClipboardItem(
+                id: UUID(),
+                type: .pdf,
+                timestamp: Date(),
+                pdfData: pdfData
+            )
+        }
+        
+        // 4. RTFD（带图片的富文本）
+        if types.contains(.rtfd),
+           let rtfdData = pasteboard.data(forType: .rtfd) {
+            return ClipboardItem(
+                id: UUID(),
+                type: .rtfd,
+                timestamp: Date(),
+                rtfdData: rtfdData
+            )
+        }
+        
+        // 5. RTF（富文本）
+        if types.contains(.rtf),
+           let rtfData = pasteboard.data(forType: .rtf) {
+            return ClipboardItem(
+                id: UUID(),
+                type: .rtf,
+                timestamp: Date(),
+                rtfData: rtfData
+            )
+        }
+        
+        // 6. 表格数据 (TSV - Tab Separated Values, 通常用于 Excel/Numbers 复制)
         if types.contains(.tabularText),
            let tsvData = pasteboard.data(forType: .tabularText) {
             return ClipboardItem(
@@ -109,18 +184,18 @@ struct ClipboardItem: Identifiable, Codable {
             )
         }
         
-        // 4. RTF (富文本)
-        if types.contains(.rtf),
-           let rtfData = pasteboard.data(forType: .rtf) {
+        // 7. URL（单独的 URL 类型，不是纯文本）
+        if types.contains(.URL),
+           let urlString = pasteboard.string(forType: .URL), !urlString.isEmpty {
             return ClipboardItem(
                 id: UUID(),
-                type: .rtf,
+                type: .url,
                 timestamp: Date(),
-                rtfData: rtfData
+                stringValue: urlString
             )
         }
-        
-        // 5. HTML
+                
+        // 8. HTML
         if types.contains(.html),
            let htmlString = pasteboard.string(forType: .html) {
             return ClipboardItem(
@@ -130,10 +205,24 @@ struct ClipboardItem: Identifiable, Codable {
                 stringValue: htmlString
             )
         }
-        
-        // 6. 纯文本
-        if types.contains(.string),
-           let stringValue = pasteboard.string(forType: .string) {
+                
+        // 9. 颜色代码
+        // 10. 纯文本
+        if types.contains(.string), let stringValue = pasteboard.string(forType: .string) {
+            let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // 检测颜色代码（#RGB, #RRGGBB, #RRGGBBAA）
+            if isColorCode(trimmed) {
+                return ClipboardItem(
+                    id: UUID(),
+                    type: .color,
+                    timestamp: Date(),
+                    stringValue: trimmed,
+                    colorValue: trimmed
+                )
+            }
+            
+            // 普通文本
             return ClipboardItem(
                 id: UUID(),
                 type: .text,
@@ -143,6 +232,13 @@ struct ClipboardItem: Identifiable, Codable {
         }
         
         return nil
+    }
+    
+    /// 检测是否是颜色代码
+    private static func isColorCode(_ string: String) -> Bool {
+        // 匹配 #RGB, #RRGGBB, #RRGGBBAA
+        let pattern = "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$"
+        return string.range(of: pattern, options: .regularExpression) != nil
     }
     
     /// 将数据写回到 NSPasteboard
@@ -158,9 +254,17 @@ struct ClipboardItem: Identifiable, Codable {
             if let data = rtfData {
                 pasteboard.setData(data, forType: .rtf)
             }
+        case .rtfd:
+            if let data = rtfdData {
+                pasteboard.setData(data, forType: .rtfd)
+            }
         case .html:
             if let str = stringValue {
                 pasteboard.setString(str, forType: .html)
+            }
+        case .pdf:
+            if let data = pdfData {
+                pasteboard.setData(data, forType: .pdf)
             }
         case .image:
             if let data = imageData {
@@ -170,6 +274,16 @@ struct ClipboardItem: Identifiable, Codable {
             if let paths = fileURLs {
                 let urls = paths.compactMap { URL(fileURLWithPath: $0) }
                 pasteboard.writeObjects(urls as [NSURL])
+            }
+        case .url:
+            if let str = stringValue {
+                pasteboard.setString(str, forType: .URL)
+                // 同时也设置为普通文本，增加兼容性
+                pasteboard.setString(str, forType: .string)
+            }
+        case .color:
+            if let str = stringValue {
+                pasteboard.setString(str, forType: .string)
             }
         case .spreadsheet:
             // 写入表格数据，同时提供纯文本备选
