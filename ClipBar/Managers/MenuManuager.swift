@@ -76,14 +76,14 @@ final class MenuManager: NSObject {
             mi.target = NSApp.delegate
             
             // 为图片类型添加缩略图
-            if item.type == .image, let imageData = item.imageData {
+            if item.displayType == .image, let imageData = item.thumbnailData {
                 if let image = NSImage(data: imageData) {
                     let thumbnail = image.resize(to: NSSize(width: 32, height: 32))
                     mi.image = thumbnail
                 }
             }
             // 为颜色类型添加色块预览
-            if item.type == .color, let colorValue = item.colorValue {
+            if item.displayType == .color, let colorValue = item.colorValue {
                 if let color = NSColor(hexString: colorValue) {
                     let colorImage = NSImage.create(with: color, size: NSSize(width: 20, height: 20))
                     mi.image = colorImage
@@ -107,14 +107,14 @@ final class MenuManager: NSObject {
                     mi.representedObject = item.id.uuidString
                     mi.target = NSApp.delegate
                     
-                    if item.type == . image, let imageData = item.imageData {
+                    if item.displayType == .image, let imageData = item.thumbnailData {
                         if let image = NSImage(data: imageData) {
                             let thumbnail = image.resize(to: NSSize(width: 32, height: 32))
                             mi.image = thumbnail
                         }
                     }
                     // 为颜色类型添加色块预览
-                    if item.type == .color, let colorValue = item.colorValue {
+                    if item.displayType == .color, let colorValue = item.colorValue {
                         if let color = NSColor(hexString: colorValue) {
                             let colorImage = NSImage.create(with: color, size: NSSize(width: 20, height: 20))
                             mi.image = colorImage
@@ -139,13 +139,11 @@ final class MenuManager: NSObject {
 
     private func menuTitle(for item: ClipboardItem, index: Int) -> String {
         let typeIcon: String
-        switch item.type {
+        switch item.displayType {
         case .text:
             typeIcon = "📝"
         case .rtf:
             typeIcon = "📄"
-        case .rtfd:
-            typeIcon = "📋"  // 带图片的文档
         case .html:
             typeIcon = "🌐"
         case .pdf:
@@ -160,6 +158,8 @@ final class MenuManager: NSObject {
             typeIcon = "🎨"
         case .spreadsheet:
             typeIcon = "📊"
+        case .unknown:
+            typeIcon = "❓"
         }
         
         let preview = item.displayText
@@ -167,10 +167,5 @@ final class MenuManager: NSObject {
             .prefix(50)
         
         return "\(index). \(typeIcon) \(preview)"
-    }
-
-    private func shortTitle(for s: String, index: Int) -> String {
-        let oneLinePreview = s.replacingOccurrences(of:  "\n", with: " ").prefix(50)
-        return "\(index). \(oneLinePreview)"
     }
 }

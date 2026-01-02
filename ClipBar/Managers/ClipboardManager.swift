@@ -77,14 +77,20 @@ final class ClipboardManager: ObservableObject {
     func handleNewClipboardItem(_ item: ClipboardItem) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            // 去重：与最新项相同则跳过
 
-            // 去重：与最新项相同则跳过 (简单比较 displayText)
-            // TODO: 可能得去重写对象的 equals 方法，或者给 ClipboardItem 增加 hashable 支持然后比较 hash 值
+            // 方案1：简单去重（快速但不够精确）(简单比较 displayText + displayType)
             if let first = self.items.first,
                first.displayText == item.displayText,
-               first.type == item.type {
+               first.displayType == item.displayType {
                 return
             }
+            // 方案2：精确去重（可选，更严格），或者给 ClipboardItem 追加一个 hash 字段，比较 hash
+            // 比较所有 pasteboardItems 的 typeIdentifier
+            // if let first = self.items.first,
+            //    self.isSameContent(first, item) {
+            //     return
+            // }
 
             // 插入到最前面
             self.items.insert(item, at: 0)
@@ -109,5 +115,24 @@ final class ClipboardManager: ObservableObject {
             guard let self = self, self.items.indices.contains(index) else { return }
             self.items.remove(at: index)
         }
+    }
+
+    /// 精确比较两个剪贴板条目是否相同（可选方法）
+    private func isSameContent(_ item1: ClipboardItem, _ item2: ClipboardItem) -> Bool {
+        // 比较类型列表
+        let types1 = Set(item1.pasteboardItems.map { $0.typeIdentifier })
+        let types2 = Set(item2.pasteboardItems.map { $0.typeIdentifier })
+        guard types1 == types2 else { return false }
+        
+        // 比较每个类型的数据
+        for typeId in types1 {
+            let data1 = item1.pasteboardItems.first { $0.typeIdentifier == typeId }?.data
+            let data2 = item2.pasteboardItems.first { $0.typeIdentifier == typeId }?.data
+            if data1 != data2 {
+                return false
+            }
+        }
+        
+        return true
     }
 }
