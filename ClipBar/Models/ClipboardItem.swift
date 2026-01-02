@@ -41,30 +41,62 @@ struct PasteboardItemData: Codable {
     let typeIdentifier: String  // NSPasteboard.PasteboardType.rawValue
     let data: Data
     
-    /// 数据大小限制（10MB），防止复制超大文件
     static let maxDataSize = 10 * 1024 * 1024
     
     init?(type: NSPasteboard.PasteboardType, from pasteboard: NSPasteboard) {
-        self.typeIdentifier = type.rawValue
+        let typeId = type.rawValue
+        self.typeIdentifier = typeId
         
-        // 尝试获取数据（支持多种方式）
+        // ✅ 跳过动态类型
+        if typeId.hasPrefix("dyn. ") {
+            #if DEBUG
+            print("⏭️ Skipping dynamic type:  \(typeId)")
+            #endif
+            return nil
+        }
+        
+        // ✅ 跳过承诺类型
+        if typeId.contains("promised") {
+            #if DEBUG
+            print("⏭️ Skipping promised type: \(typeId)")
+            #endif
+            return nil
+        }
+        
+        // 方法1: data(forType:)
         if let data = pasteboard.data(forType: type) {
-            // 跳过超大数据
+            // ✅ 跳过空数据
+            guard !data.isEmpty else {
+                #if DEBUG
+                print("⏭️ Skipping empty data:  \(typeId)")
+                #endif
+                return nil
+            }
+            
             guard data.count <= Self.maxDataSize else {
                 #if DEBUG
-                print("[PasteboardItemData] ⚠️ Skipping large data for type \(type.rawValue): \(data.count) bytes")
+                print("⚠️ Skipping large data \(typeId): \(data.count) bytes")
                 #endif
                 return nil
             }
             self.data = data
-        } else if let string = pasteboard.string(forType: type) {
-            // 有些类型只能用 string(forType: ) 获取
+            return
+        }
+        
+        // 方法2: string(forType:)
+        if let string = pasteboard.string(forType: type) {
+            guard !string.isEmpty else {
+                return nil
+            }
             guard let stringData = string.data(using: .utf8) else {
                 return nil
             }
             self.data = stringData
-        } else if let propertyList = pasteboard.propertyList(forType: type) {
-            // 有些类型（如 fileURL）需要用 propertyList
+            return
+        }
+        
+        // 方法3: propertyList(forType:)
+        if let propertyList = pasteboard.propertyList(forType: type) {
             guard let plistData = try? PropertyListSerialization.data(
                 fromPropertyList: propertyList,
                 format: .binary,
@@ -73,10 +105,11 @@ struct PasteboardItemData: Codable {
                 return nil
             }
             self.data = plistData
-        } else {
-            // 无法获取数据
-            return nil
+            return
         }
+        
+        // 无法获取数据
+        return nil
     }
 }
 
@@ -156,8 +189,13 @@ struct ClipboardItem: Identifiable, Codable {
         
         // 检测图片
         if types.contains(.tiff) || types.contains(.png) {
-            let imageData = pasteboard.data(forType: .tiff) ?? pasteboard.data(forType: .png)
-            return (.image, "[Image]", nil, imageData)
+            if let imageData = pasteboard.data(forType: .tiff) ??  pasteboard.data(forType: .png) {
+                // ✅ 验证图片数据是否有效
+                if NSImage(data: imageData) != nil {
+                    return (.image, "[Image]", nil, imageData)
+                }
+            }
+            // 如果图片无效，继续检查其他类型
         }
         
         // 检测 PDF
@@ -167,6 +205,15 @@ struct ClipboardItem: Identifiable, Codable {
         
         // 检测表格
         if types.contains(.tabularText) {
+            if let tsvData = pasteboard.data(forType: .tabularText),
+               let tsvString = String(data: tsvData, encoding: .utf8) {
+                // ✅ 显示表格前几个单元格
+                let lines = tsvString.components(separatedBy: .newlines).prefix(2)
+                let preview = lines.map { line in
+                    line.components(separatedBy: "\t").prefix(3).joined(separator: " | ")
+                }.joined(separator: " ")
+                return (.spreadsheet, String(preview.prefix(100)), nil, nil)
+            }
             return (.spreadsheet, "[Spreadsheet Data]", nil, nil)
         }
         
