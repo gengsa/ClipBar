@@ -23,7 +23,7 @@ import Foundation
 import AppKit
 
 /// 剪贴板条目类型
-enum ClipboardItemType: String, Codable {
+enum ClipboardItemType: String, Codable, CaseIterable {
     case text           // 纯文本
     case rtf            // 富文本
     case html           // HTML
@@ -31,9 +31,46 @@ enum ClipboardItemType: String, Codable {
     case file           // 文件引用
     case pdf            // PDF
     case url            // URL
-    case color          // 颜色代码
-    case spreadsheet    // 表格
     case unknown        // 未知类型
+    
+    var allowedPasteboardTypes: [NSPasteboard.PasteboardType] {
+        switch self {
+        case .text:
+            return [.string]
+        case .rtf:
+            return [.rtf, .rtfd]
+        case .html:
+            return [.html]
+        case .image:
+            return [.png, .tiff]
+        case .file:
+            return [.fileURL]
+        case .pdf:
+            return [.pdf]
+        case .url:
+            return [.URL]
+        case .unknown:
+            return []
+        }
+    }
+
+    static let whitelistedPasteboardTypes: Set<NSPasteboard.PasteboardType> = {
+        Set(
+            ClipboardItemType
+                .allCases
+                .flatMap { $0.allowedPasteboardTypes }
+        )
+    }()
+    
+    static func supports(_ pasteboardType: NSPasteboard.PasteboardType) -> Bool {
+        allCases.contains { $0.allowedPasteboardTypes.contains(pasteboardType) }
+    }
+
+    static func from(pasteboardType: NSPasteboard.PasteboardType) -> ClipboardItemType {
+        allCases.first {
+            $0.allowedPasteboardTypes.contains(pasteboardType)
+        } ?? .unknown
+    }
 }
 
 /// 单个 pasteboard type 的数据
@@ -43,25 +80,15 @@ struct PasteboardItemData: Codable {
     
     static let maxDataSize = 10 * 1024 * 1024
     
+    /// Eager read for persistent clipboard item
+    /// Only called for whitelisted pasteboard types
     init?(type: NSPasteboard.PasteboardType, from pasteboard: NSPasteboard) {
+        // 只能处理支持的类型
+        guard ClipboardItemType.supports(type) else {
+            return nil
+        }
         let typeId = type.rawValue
         self.typeIdentifier = typeId
-        
-        // ✅ 跳过动态类型
-        if typeId.hasPrefix("dyn. ") {
-            #if DEBUG
-            print("⏭️ Skipping dynamic type:  \(typeId)")
-            #endif
-            return nil
-        }
-        
-        // ✅ 跳过承诺类型
-        if typeId.contains("promised") {
-            #if DEBUG
-            print("⏭️ Skipping promised type: \(typeId)")
-            #endif
-            return nil
-        }
         
         // 方法1: data(forType:)
         if let data = pasteboard.data(forType: type) {
@@ -136,14 +163,25 @@ struct ClipboardItem: Identifiable, Codable {
     //完全透明，只做复制，不识别具体类型
     // 只为显示预览目的分析类型
     static func from(pasteboard: NSPasteboard) -> ClipboardItem? {
-        guard let types = pasteboard.types, !types.isEmpty else {
+        
+        guard var types = pasteboard.types, !types.isEmpty else {
             return nil
         }
         #if DEBUG
         print("[ClipboardItem] 📋 Pasteboard types: \(types.map { $0.rawValue })")
         #endif
-        
-        // 获取所有类型的数据（不关心具体是什么）
+        // 只获取所有支持的类型
+        types = types.filter { ClipboardItemType.supports($0) }
+        if (types.isEmpty) {
+            #if DEBUG
+            print("[ClipboardItem] filted allowed Pasteboard types is empty")
+            #endif
+            return nil
+        }
+        #if DEBUG
+        print("[ClipboardItem] 📋 filted allowed Pasteboard types: \(types.map { $0.rawValue })")
+        #endif
+
         var items: [PasteboardItemData] = []
         for type in types {
             if let itemData = PasteboardItemData(type: type, from: pasteboard) {
@@ -175,6 +213,9 @@ struct ClipboardItem: Identifiable, Codable {
         pasteboard: NSPasteboard
     ) -> (type: ClipboardItemType, text: String, colorValue: String?, thumbnailData: Data?) {
         
+        // TODO: 这里的优先级可能得再研究下
+        // TODO: 映射也许可以改一下实现。我现在有了好用的枚举
+
         // 检测文件
         if types.contains(.fileURL),
            let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL], !urls.isEmpty {
@@ -203,20 +244,6 @@ struct ClipboardItem: Identifiable, Codable {
             return (.pdf, "[PDF Document]", nil, nil)
         }
         
-        // 检测表格
-        if types.contains(.tabularText) {
-            if let tsvData = pasteboard.data(forType: .tabularText),
-               let tsvString = String(data: tsvData, encoding: .utf8) {
-                // ✅ 显示表格前几个单元格
-                let lines = tsvString.components(separatedBy: .newlines).prefix(2)
-                let preview = lines.map { line in
-                    line.components(separatedBy: "\t").prefix(3).joined(separator: " | ")
-                }.joined(separator: " ")
-                return (.spreadsheet, String(preview.prefix(100)), nil, nil)
-            }
-            return (.spreadsheet, "[Spreadsheet Data]", nil, nil)
-        }
-        
         // 检测 RTF/RTFD
         if types.contains(.rtfd) || types.contains(.rtf) {
             // 尝试提取纯文本预览
@@ -238,21 +265,18 @@ struct ClipboardItem: Identifiable, Codable {
             }
             return (.html, "[HTML]", nil, nil)
         }
-        
+
+        // 检测 URL
+        if types.contains(.URL),
+            let string = pasteboard.string(forType: .URL) {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return (.url, trimmed, nil, nil)
+        }
+
         // 检测纯文本
         if types.contains(.string),
            let string = pasteboard.string(forType: .string) {
             let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            // 检测颜色代码
-            if isColorCode(trimmed) {
-                return (.color, trimmed, trimmed, nil)
-            }
-            
-            // 检测 URL
-            if types.contains(.URL) {
-                return (.url, trimmed, nil, nil)
-            }
             
             // 普通文本
             return (.text, String(trimmed.prefix(100)), nil, nil)

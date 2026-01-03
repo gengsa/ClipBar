@@ -82,13 +82,6 @@ final class MenuManager: NSObject {
                     mi.image = thumbnail
                 }
             }
-            // 为颜色类型添加色块预览
-            if item.displayType == .color, let colorValue = item.colorValue {
-                if let color = NSColor(hexString: colorValue) {
-                    let colorImage = NSImage.create(with: color, size: NSSize(width: 20, height: 20))
-                    mi.image = colorImage
-                }
-            }
             
             clipMenu.addItem(mi)
         }
@@ -111,13 +104,6 @@ final class MenuManager: NSObject {
                         if let image = NSImage(data: imageData) {
                             let thumbnail = image.resize(to: NSSize(width: 32, height: 32))
                             mi.image = thumbnail
-                        }
-                    }
-                    // 为颜色类型添加色块预览
-                    if item.displayType == .color, let colorValue = item.colorValue {
-                        if let color = NSColor(hexString: colorValue) {
-                            let colorImage = NSImage.create(with: color, size: NSSize(width: 20, height: 20))
-                            mi.image = colorImage
                         }
                     }
 
@@ -154,10 +140,6 @@ final class MenuManager: NSObject {
             typeIcon = "📁"
         case .url:
             typeIcon = "🔗"
-        case .color:
-            typeIcon = "🎨"
-        case .spreadsheet:
-            typeIcon = "📊"
         case .unknown:
             typeIcon = "❓"
         }
