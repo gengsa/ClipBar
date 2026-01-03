@@ -145,6 +145,11 @@ struct ClipboardItem: Identifiable, Codable {
     let id:  UUID
     let timestamp: Date
     
+    // 复制来时系统粘贴板的 count
+    // 用来在选中条目要粘贴时判断，如果与当前系统粘贴板的 count 一致，不用清空粘贴板和写入数据
+    // 我们保存的只有数种类型，不可能比系统粘贴板的更全
+    let sourceChangeCount: Int
+    
     // 核心：保存所有原始数据
     var pasteboardItems: [PasteboardItemData]
     
@@ -197,6 +202,7 @@ struct ClipboardItem: Identifiable, Codable {
         return ClipboardItem(
             id: UUID(),
             timestamp: Date(),
+            sourceChangeCount: pasteboard.changeCount,
             pasteboardItems: items,
             displayType: displayInfo.type,
             displayText: displayInfo.text,
@@ -260,7 +266,7 @@ struct ClipboardItem: Identifiable, Codable {
             if let html = pasteboard.string(forType: .html),
                let data = html.data(using: . utf8),
                let attributed = NSAttributedString(html: data, documentAttributes: nil) {
-                let preview = attributed.string.trimmingCharacters(in:  .whitespacesAndNewlines)
+                let preview = attributed.string.trimmingCharacters(in: .whitespacesAndNewlines)
                 return (.html, String(preview.prefix(100)), nil, nil)
             }
             return (.html, "[HTML]", nil, nil)
@@ -295,6 +301,11 @@ struct ClipboardItem: Identifiable, Codable {
     
     /// 将数据写回到 NSPasteboard
     func writeTo(pasteboard: NSPasteboard) {
+        // 如果剪贴板的 changeCount 一致，以系统粘贴板的数据为主，不用清空，不用写入
+        if pasteboard.changeCount == sourceChangeCount {
+            return
+        }
+
         pasteboard.clearContents()
         
         // 原封不动地写回所有数据
